@@ -1,0 +1,6 @@
+{
+  "name": "Shells in the Shadows: Back Alley Tales",
+  "description": "A gritty 16-bit side-scrolling beat-em-up adventure featuring the Ninja Turtles in a dark, urban underground setting.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
