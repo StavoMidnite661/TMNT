@@ -15,6 +15,9 @@ export default class CharacterSelectScene extends Phaser.Scene {
   }
 
   create() {
+    // Tell the React shell where we are (gates the virtual gamepad)
+    hudBus.set({ screen: 'select' });
+
     // Cinematic background
     const bg = this.add.image(this.cameras.main.centerX, this.cameras.main.centerY, 'alley_bg_hq');
     bg.setDisplaySize(this.cameras.main.width, this.cameras.main.height).setAlpha(0.6).setTint(0x4444ff);
@@ -71,8 +74,14 @@ export default class CharacterSelectScene extends Phaser.Scene {
 
       portrait.setInteractive({ useHandCursor: true });
       portrait.on('pointerdown', () => {
-        this.selectedIndex = i;
-        this.updateSelection();
+        if (this.selectedIndex === i) {
+          // Tapping the already-selected brother deploys — this is how the
+          // game starts on touch devices (no keyboard required).
+          this.startGame();
+        } else {
+          this.selectedIndex = i;
+          this.updateSelection();
+        }
       });
 
       this.turtleSprites.push(portrait);
@@ -97,15 +106,21 @@ export default class CharacterSelectScene extends Phaser.Scene {
 
     this.statGroup = this.add.group();
 
-    this.add.text(this.scale.width / 2, 680, 'PRESS [SPACE] OR [ENTER] TO INFILTRATE', {
+    const prompt = this.add.text(this.scale.width / 2, 680, 'TAP SELECTED TURTLE • [SPACE] / [ENTER] TO INFILTRATE', {
       fontFamily: 'monospace',
       fontSize: '14px',
       color: '#ffff00',
       stroke: '#000000',
       strokeThickness: 2
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+    prompt.on('pointerdown', () => this.startGame());
+    prompt.on('pointerover', () => prompt.setColor('#ffffff'));
+    prompt.on('pointerout', () => prompt.setColor('#ffff00'));
+    this.tweens.add({ targets: prompt, alpha: 0.55, duration: 600, yoyo: true, repeat: -1 });
 
     // Controls
+    this.input.keyboard?.addCapture('LEFT,RIGHT,SPACE,ENTER');
     this.input.keyboard?.on('keydown-LEFT', () => {
       this.selectedIndex = (this.selectedIndex - 1 + this.turtles.length) % this.turtles.length;
       this.updateSelection();

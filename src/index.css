@@ -16,7 +16,32 @@ canvas {
     margin: 0;
     height: 100vh;
     overflow: hidden;
+    /* Kill rubber-band / pull-to-refresh while playing */
+    overscroll-behavior: none;
+    /* No tap flash on the virtual buttons */
+    -webkit-tap-highlight-color: transparent;
   }
+}
+
+/* App shell: dynamic viewport height so mobile browser URL bars don't crop it */
+.app-shell {
+  height: 100vh;
+}
+@supports (height: 100dvh) {
+  .app-shell {
+    height: 100dvh;
+  }
+}
+
+/* The canvas handles its own gestures — never let the browser intercept them */
+#game-container canvas {
+  touch-action: none;
+}
+
+/* Tappable UI (overlays, pause button) responds instantly, no 300ms delay */
+button,
+[role='button'] {
+  touch-action: manipulation;
 }
 
 @keyframes scan {

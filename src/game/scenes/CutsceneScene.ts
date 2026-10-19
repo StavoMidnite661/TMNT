@@ -20,6 +20,9 @@ export default class CutsceneScene extends Phaser.Scene {
   }
 
   async init(data: any) {
+    // Tell the React shell where we are (gates the virtual gamepad)
+    hudBus.set({ screen: 'cutscene' });
+
     this.add.rectangle(0, 0, this.scale.width, this.scale.height, 0x000000).setOrigin(0);
     this.statusText = this.add.text(this.scale.width / 2, this.scale.height / 2, 'CONNECTING...', {
       fontFamily: 'monospace',
@@ -44,7 +47,7 @@ export default class CutsceneScene extends Phaser.Scene {
       console.warn('[Cutscene] AI dialogue unavailable, using fallback.', e);
       this.failed = true;
       this.dialogue = FALLBACK_DIALOGUE;
-      this.statusText.setText('SIGNAL LOST — PRESS ANY KEY TO RETRY / CONTINUE');
+      this.statusText.setText('SIGNAL LOST — TAP OR PRESS ANY KEY TO CONTINUE');
       this.showDialogue();
     }
   }
@@ -67,8 +70,16 @@ export default class CutsceneScene extends Phaser.Scene {
     });
 
     this.input.on('pointerdown', () => this.nextStep());
+    this.input.keyboard?.addCapture('SPACE,ENTER');
     this.input.keyboard?.on('keydown-SPACE', () => this.nextStep());
     this.input.keyboard?.on('keydown-ENTER', () => this.nextStep());
+
+    // Continue hint — works for touch and keyboard alike
+    this.add.text(this.scale.width / 2, this.scale.height - 40, 'TAP OR PRESS SPACE TO CONTINUE', {
+      fontFamily: 'monospace',
+      fontSize: '14px',
+      color: '#666666',
+    }).setOrigin(0.5).setAlpha(0.8);
 
     this.updateContent();
   }

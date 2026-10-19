@@ -3,6 +3,7 @@ import Player from '../components/Player';
 import Enemy from '../components/Enemy';
 import SoundSynth from '../utils/SoundSynth';
 import { hudBus } from '../hudBus';
+import { controlBus } from '../controlBus';
 import { HIGH_SCORE_KEY, WORLD_LENGTH_SCREENS } from '../constants';
 import type { TurtleCharacter } from '../types';
 
@@ -24,6 +25,10 @@ export default class MainScene extends Phaser.Scene {
   private hudTimer = 0;
   private highScore = 0;
   private lastCombo = 0;
+  /** Unsubscribe from controlBus (set in create, cleared on shutdown). */
+  private unsubCommands: (() => void) | null = null;
+  /** Restart flow created by showGameOver, also driven by taps on the React overlay. */
+  private pendingRestart: (() => void) | null = null;
   private debrisParticles!: Phaser.GameObjects.Particles.ParticleEmitter;
   private bloodParticles!: Phaser.GameObjects.Particles.ParticleEmitter;
   private sparkParticles!: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -51,6 +56,18 @@ export default class MainScene extends Phaser.Scene {
     this.isTransitioning = true; // Block level checks during initialization
     this.gameOver = false;
     this.paused = false;
+    this.pendingRestart = null;
+    // Release any virtual buttons that were held when the scene ended
+    this.virtualControls = {
+      up: false,
+      down: false,
+      left: false,
+      right: false,
+      attack: false,
+      dodge: false,
+      jump: false,
+      special: false,
+    };
     const worldWidth = this.scale.width * WORLD_LENGTH_SCREENS;
 
     // Parallax Layers (Deep to Front)
@@ -107,6 +124,8 @@ export default class MainScene extends Phaser.Scene {
 
     // Controls
     this.cursors = this.input.keyboard?.createCursorKeys();
+    // Stop the page from scrolling/zooming on gameplay keys (space, arrows…)
+    this.input.keyboard?.addCapture('UP,DOWN,LEFT,RIGHT,SPACE,ENTER,SHIFT,Z,X');
 
     // UI
     this.createUI();
@@ -211,11 +230,14 @@ export default class MainScene extends Phaser.Scene {
       }
     });
 
-    // Mobile Virtual Buttons
+    // Mobile Virtual Buttons — remove first so scene restarts never stack
+    // duplicate handlers (a stacked `playerDied` used to drain extra lives!)
+    this.events.off('v-control');
     this.events.on('v-control', (data: any) => {
       this.virtualControls = { ...this.virtualControls, ...data };
     });
 
+    this.events.off('playerSpecial');
     this.events.on('playerSpecial', () => {
       this.cameras.main.flash(500, 255, 255, 255);
       this.cameras.main.shake(500, 0.03);
@@ -232,6 +254,7 @@ export default class MainScene extends Phaser.Scene {
     });
 
     // Life / death flow
+    this.events.off('playerDied');
     this.events.on('playerDied', () => this.onPlayerDied());
 
     // Pizza pickups — the classic beat-em-up health drop
@@ -269,6 +292,22 @@ export default class MainScene extends Phaser.Scene {
     this.game.events.on('blur', () => {
       if (!this.gameOver) this.setPaused(true);
     });
+
+    // React shell commands (on-screen pause button, tap-to-resume / tap-to-retry).
+    // The React overlays sit above the canvas, so their taps arrive via controlBus.
+    this.unsubCommands?.();
+    this.unsubCommands = controlBus.on((cmd) => {
+      if (cmd === 'toggle-pause') this.togglePause();
+      else if (cmd === 'resume' && !this.gameOver) this.setPaused(false);
+      else if (cmd === 'retry') this.handleRetry();
+    });
+    this.events.once('shutdown', () => {
+      this.unsubCommands?.();
+      this.unsubCommands = null;
+    });
+
+    // Tell the React shell the battle is live (gates the virtual gamepad)
+    hudBus.set({ screen: 'play' });
 
     this.syncHud();
   }
@@ -334,7 +373,7 @@ export default class MainScene extends Phaser.Scene {
       strokeThickness: 4,
     }).setOrigin(0.5).setDepth(3000).setScrollFactor(0);
 
-    const retry = this.add.text(this.scale.width / 2, this.scale.height / 2 + 110, 'PRESS ENTER TO RETRY', {
+    const retry = this.add.text(this.scale.width / 2, this.scale.height / 2 + 110, 'TAP OR PRESS ENTER TO RETRY', {
       fontFamily: 'monospace',
       fontSize: '18px',
       color: '#ffff00',
@@ -345,6 +384,7 @@ export default class MainScene extends Phaser.Scene {
     this.tweens.add({ targets: retry, alpha: 0, duration: 600, yoyo: true, repeat: -1 });
 
     const restart = () => {
+      this.pendingRestart = null;
       this.input.keyboard?.off('keydown-ENTER', restart);
       this.input.keyboard?.off('keydown-SPACE', restart);
       this.input.off('pointerdown', restart);
@@ -357,8 +397,17 @@ export default class MainScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-ENTER', restart);
     this.input.keyboard?.on('keydown-SPACE', restart);
     this.input.on('pointerdown', restart);
+    // Exposed so taps on the React GAME OVER overlay (which covers the canvas
+    // and never reaches Phaser input) can drive the same restart via controlBus.
+    this.pendingRestart = restart;
 
     hudBus.set({ gameOver: true });
+  }
+
+  /** Restart the run — fired by Enter/Space, canvas tap, or the React overlay tap. */
+  private handleRetry() {
+    if (!this.gameOver || !this.pendingRestart) return;
+    this.pendingRestart();
   }
 
   private togglePause() {

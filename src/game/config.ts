@@ -20,6 +20,12 @@ export const config: Phaser.Types.Core.GameConfig = {
     }
   },
   scene: [PreloadScene, TitleScene, CharacterSelectScene, MainScene, CutsceneScene],
+  // Suppress the browser context menu on long-press / right-click over the canvas
+  disableContextMenu: true,
+  input: {
+    // Multi-touch: keep several fingers tracked (move + attack at once)
+    activePointers: 3,
+  },
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH
