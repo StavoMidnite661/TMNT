@@ -33,7 +33,7 @@ The game is built on **Phaser 4** for the canvas gameplay, **React 19 + Tailwind
 - 🔊 **Fully synthesized audio** — every sound effect *and the chiptune soundtrack* are generated with the Web Audio API at runtime. Zero audio assets required
 - 🍕 **Pizza pickups** — slain enemies drop healing pizza (because it's the TMNT)
 - 🤖 **AI-generated cutscenes** — the ending dialogue is written on the fly by Gemini and streamed into the HUD's "radio feed"
-- 📱 **Touch controls** — virtual D-pad, attack/special/jump/roll buttons appear on mobile
+- 📱 **Touch controls** — virtual D-pad, attack/special/jump/roll buttons appear on any touch device (phones and tablets, portrait *or* landscape), with an on-screen pause button and tap-to-resume / tap-to-retry overlays
 - 🏆 **Arcade systems** — lives, score, persistent high score (localStorage), special gauge, pause, and game-over/retry flow
 - 🎛️ **Live React HUD** — health, lives, score, gauge, sector, and combo are synced from the game loop in real time
 
@@ -48,8 +48,17 @@ The game is built on **Phaser 4** for the canvas gameplay, **React 19 + Tailwind
 | Special (requires 100% gauge) | `Z` or `K` | **A** button |
 | Dodge roll (i-frames) | `Shift` or `L` | **ROLL** button |
 | Jump (hop lanes / clear melee) | `X` or `I` | **JMP** button |
-| Pause | `Esc` or `P` | — |
+| Pause | `Esc` or `P` | ❚❚ button (top-right) |
 | Advance dialogue / start | `Enter` / `Space` / tap | tap |
+
+### Playing on a phone
+
+The deployable build is fully touch-capable — no keyboard required:
+
+- The **virtual gamepad appears automatically on any touch device** (detected via `pointer: coarse`, not viewport width, so large phones and tablets keep their controls in landscape too). It only shows during battle — never over menus.
+- **Everything is tappable at runtime:** tap a turtle twice to deploy it, tap the ❚❚ button to pause, tap the *PAUSED* overlay to resume, and tap *GAME OVER* to retry.
+- **The on-screen keyboard never pops up** — the game is canvas-driven with no focusable inputs, and double-tap zoom / pinch / pull-to-refresh / long-press menus are suppressed during play. A paired hardware keyboard still works: `Enter`/`Space` advance and retry exactly as on desktop.
+- **Phone layout:** the HUD collapses to a compact header + mission strip so the alley fills the screen, controls respect notch/home-indicator safe areas, and a dismissible hint suggests rotating to landscape for the full 16:9 view.
 
 ### Characters
 

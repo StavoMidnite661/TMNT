@@ -7,6 +7,8 @@ import type { DialogueLine } from './types';
  * game world without touching Phaser's DOM.
  */
 export interface HudState {
+  /** Which scene is currently driving the game: gates the virtual gamepad. */
+  screen: 'title' | 'select' | 'play' | 'cutscene';
   characterName: string;
   /** CSS hex color of the active turtle (for HUD accents). */
   characterColor: string;
@@ -28,6 +30,7 @@ export interface HudState {
 }
 
 export const DEFAULT_HUD_STATE: HudState = {
+  screen: 'title',
   characterName: 'LEO',
   characterColor: '#0055ff',
   portraitFrame: 0,

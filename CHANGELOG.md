@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+**Phone-capable runtime input & mobile layout**
+- Virtual gamepad now gates on **touch capability** (`pointer: coarse` / `hover: none`) instead of `md:hidden` — controls no longer vanish on large phones/tablets in landscape (≥768px viewports), and they only render during active battle (previously dead buttons hovered over the title/select screens)
+- Fixed touch soft-locks: the React `PAUSED` / `GAME OVER` overlays swallowed taps aimed at the canvas — both are now tappable (`TAP OR PRESS ESC TO RESUME` / `TAP OR PRESS ENTER TO RETRY`) via a new `controlBus` command channel (React → Phaser) with shutdown-safe subscriptions
+- Character select is finishable by touch: tap a portrait to select, **tap the selected turtle again (or the prompt) to infiltrate** — previously the run could only be started with `Enter`/`Space`
+- On-screen ❚❚ pause button for touch; keyboard capture (`SPACE,ENTER,arrows…`) stops the page scrolling/zooming on gameplay keys; `Enter`/`Space` remain fully wired on every screen for hardware keyboards
+- Fixed a scene-restart listener leak: `v-control` / `playerSpecial` / `playerDied` handlers stacked on every retry (stacked `playerDied` could drain multiple lives per death); handlers are now de-duplicated and released on shutdown, and held virtual buttons auto-release when the gamepad unmounts or the scene restarts
+- Mobile layout: shell uses `100dvh` (no iOS URL-bar crop), HUD collapses to a compact header + mission strip on phones so the canvas fills the screen, gamepad respects notch safe areas, rotate-to-landscape hint, viewport locked against pinch/double-tap zoom with `overscroll-behavior`/`touch-action` guards and the canvas context menu disabled; multi-touch raised to 3 active pointers
+- Title / cutscene prompts are device-aware (`TAP TO START`, `TAP OR PRESS SPACE TO CONTINUE`)
+
 **Deployment**
 - Fixed deployment-breaking asset paths: art moved from `src/assets/images/` to `public/assets/images/` (Phaser loads by runtime URL; Vite only bundles imported assets, so the game was broken in any production build)
 - Relative asset base (`vite.base = './'`) so the build works on project sub-paths (GitHub Pages) too

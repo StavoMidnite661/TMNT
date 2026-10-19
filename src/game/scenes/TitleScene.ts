@@ -65,8 +65,9 @@ export default class TitleScene extends Phaser.Scene {
       align: 'center'
     }).setOrigin(0.5);
 
-    // "Press Start" flashing
-    const startText = this.add.text(this.scale.width / 2, 500, 'PRESS START', {
+    // "Press Start" flashing — touch devices tap, keyboards press
+    const startLabel = this.sys.game.device.input.touch ? 'TAP TO START' : 'PRESS START';
+    const startText = this.add.text(this.scale.width / 2, 500, startLabel, {
       fontFamily: 'monospace',
       fontSize: '24px',
       color: '#ffff00',
@@ -96,6 +97,7 @@ export default class TitleScene extends Phaser.Scene {
     // Input to start
     // Audio requires a user gesture — kick off the chiptune loop here
     const bootAudio = () => SoundSynth.startMusic();
+    this.input.keyboard?.addCapture('SPACE,ENTER');
     this.input.keyboard?.on('keydown', bootAudio);
     this.input.on('pointerdown', bootAudio);
 
