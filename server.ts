@@ -1,76 +1,63 @@
-import express from "express";
-import path from "path";
-import { createServer as createViteServer } from "vite";
-import { GoogleGenAI } from "@google/genai";
-import dotenv from "dotenv";
+import express from 'express';
+import path from 'path';
+import { createServer as createViteServer } from 'vite';
+import { generateCutscene } from './api/cutscene';
+import dotenv from 'dotenv';
 
 dotenv.config();
 
+const PORT = Number(process.env.PORT) || 3000;
+const isProd = process.env.NODE_ENV === 'production';
+
 async function startServer() {
   const app = express();
-  const PORT = 3000;
 
-  app.use(express.json());
-
-  // Gemini API implementation for dynamic story/dialogue
-  const genAI = new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY || "",
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build',
-      }
-    }
-  });
-
-  app.post("/api/cutscene", async (req, res) => {
-    try {
-      const { sceneContext, playerChoice } = req.body;
-      const prompt = `
-        You are writing dialogue for a gritty, mature 16-bit TMNT-inspired beat-em-up game called 'Shells in the Shadows'. 
-        The tone is dark, urban, and industrial. 
-        Context: ${sceneContext}
-        Player Choice: ${playerChoice || 'None'}
-        
-        Write a brief interaction (max 3 lines) between a Turtle and a gritty NPC (e.g. a gang leader, a corrupt cop, or a mysterious contact).
-        Include a moral consequence or a hint for the next level.
-        Output as JSON: { "dialogue": [ { "name": "CHARACTER_NAME", "text": "DIALOGUE_TEXT" } ] }
-      `;
-      
-      const response = await genAI.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
-      });
-      
-      const text = response.text || "";
-      
-      // Attempt to parse JSON from response
-      const jsonMatch = text.match(/\{.*\}/s);
-      if (jsonMatch) {
-         res.json(JSON.parse(jsonMatch[0]));
-      } else {
-         res.json({ dialogue: [{ name: "Shadows", text: "..." }] });
-      }
-    } catch (error) {
-      console.error("Gemini Error:", error);
-      res.status(500).json({ error: "Failed to generate story" });
-    }
-  });
-
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+  // Security headers (production only — dev needs inline scripts for Vite HMR)
+  if (isProd) {
+    app.disable('x-powered-by');
+    app.use((_req, res, next) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Frame-Options', 'DENY');
+      res.setHeader('Referrer-Policy', 'no-referrer');
+      res.setHeader(
+        'Content-Security-Policy',
+        "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; script-src 'self'; connect-src 'self'"
+      );
+      next();
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  app.use(express.json({ limit: '16kb' }));
+
+  app.get('/api/health', (_req, res) => {
+    res.json({ ok: true, ai: Boolean(process.env.GEMINI_API_KEY), model: process.env.GEMINI_MODEL || 'gemini-3-flash-preview' });
+  });
+
+  // AI-generated cutscene dialogue (shared with the Vercel serverless function)
+  app.post('/api/cutscene', async (req, res) => {
+    const result = await generateCutscene(req.body);
+    res.status(result.status).json(result.body);
+  });
+
+  if (!isProd) {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    // SPA fallback — everything else serves the app shell
+    app.use((req, res) => {
+      if (req.path.startsWith('/api/')) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  }
+
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }

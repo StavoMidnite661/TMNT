@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import { hudBus } from '../hudBus';
+import SoundSynth from '../utils/SoundSynth';
 
 export default class TitleScene extends Phaser.Scene {
   constructor() {
@@ -6,6 +8,9 @@ export default class TitleScene extends Phaser.Scene {
   }
 
   create() {
+    // Reset the run state whenever we return to the title screen
+    hudBus.reset();
+
     // Add title background
     const bg = this.add.image(this.cameras.main.centerX, this.cameras.main.centerY, 'title_bg_hq');
     bg.setDisplaySize(this.cameras.main.width, this.cameras.main.height);
@@ -89,6 +94,11 @@ export default class TitleScene extends Phaser.Scene {
     wishlist.on('pointerout', () => wishlist.setColor('#aaaaaa'));
 
     // Input to start
+    // Audio requires a user gesture — kick off the chiptune loop here
+    const bootAudio = () => SoundSynth.startMusic();
+    this.input.keyboard?.on('keydown', bootAudio);
+    this.input.on('pointerdown', bootAudio);
+
     this.input.keyboard?.on('keydown-ENTER', () => this.startSelect());
     this.input.keyboard?.on('keydown-SPACE', () => this.startSelect());
     this.input.on('pointerdown', () => this.startSelect());

@@ -1,25 +1,28 @@
 {
-  "name": "react-example",
+  "name": "shells-in-the-shadows",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "A gritty 16-bit side-scrolling beat-em-up featuring the Ninja Turtles in a dark, urban underground setting.",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "preview": "npm run build && npm start",
+    "deploy:pages": "vite build && gh-pages -d dist"
   },
   "dependencies": {
     "@google/genai": "^2.5.0",
     "@tailwindcss/vite": "^4.3.0",
     "@types/react": "^19.2.15",
-    "@types/react-dom": "^19.2.3",
+    "@types/react-dom": "^19.2.23",
     "@vitejs/plugin-react": "^6.0.2",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "lucide-react": "^1.16.0",
-    "motion": "^12.39.0",
     "phaser": "^4.1.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
@@ -28,11 +31,10 @@
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^25.9.1",
-    "autoprefixer": "^10.5.0",
     "esbuild": "^0.28.0",
+    "gh-pages": "^6.3.0",
     "tailwindcss": "^4.3.0",
     "tsx": "^4.22.3",
-    "typescript": "~6.0.3",
-    "vite": "^8.0.13"
+    "typescript": "~6.0.3"
   }
 }
