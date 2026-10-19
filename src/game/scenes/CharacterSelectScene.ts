@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { TURTLES } from '../constants';
+import { hudBus } from '../hudBus';
 
 export default class CharacterSelectScene extends Phaser.Scene {
   private selectedIndex = 0;
@@ -155,6 +156,13 @@ export default class CharacterSelectScene extends Phaser.Scene {
   }
 
   startGame() {
-    this.scene.start('MainScene', { character: this.turtles[this.selectedIndex] });
+    const turtle = this.turtles[this.selectedIndex];
+    // Pre-arm the React HUD with the chosen brother
+    hudBus.set({
+      characterName: turtle.name.toUpperCase(),
+      characterColor: '#' + turtle.color.toString(16).padStart(6, '0'),
+      portraitFrame: turtle.portraitIndex,
+    });
+    this.scene.start('MainScene', { character: turtle });
   }
 }

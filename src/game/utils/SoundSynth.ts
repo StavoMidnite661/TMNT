@@ -15,7 +15,157 @@ export default class SoundSynth {
 
   public static toggleMute() {
     this.isMuted = !this.isMuted;
+    if (this.isMuted) {
+      this.stopMusic();
+    } else {
+      this.startMusic();
+    }
     return this.isMuted;
+  }
+
+  // ------------------------------------------------------------------
+  // Procedural chiptune loop — a dark A-minor groove synthesized live.
+  // No audio files, everything is oscillators + noise.
+  // ------------------------------------------------------------------
+
+  private static readonly MUSIC_BPM = 96;
+
+  /** 4 bars x 16 sixteenth-steps. 0 = rest. */
+  private static readonly BASS_LINE = [
+    55, 55, 55, 55, 55, 55, 55, 55, 65.41, 65.41, 65.41, 65.41, 65.41, 65.41, 65.41, 65.41,
+    49, 49, 49, 49, 49, 49, 49, 49, 58.27, 58.27, 58.27, 58.27, 58.27, 58.27, 58.27, 58.27,
+    55, 55, 55, 55, 55, 55, 55, 55, 65.41, 65.41, 65.41, 65.41, 65.41, 65.41, 65.41, 65.41,
+    73.42, 73.42, 73.42, 73.42, 73.42, 73.42, 73.42, 73.42, 82.41, 82.41, 82.41, 82.41, 98, 98, 82.41, 82.41,
+  ];
+
+  /** Sparse lead melody — mostly bar 4, very 16-bit. */
+  private static readonly LEAD_LINE = [
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 220, 0, 0, 0, 0, 0, 261.63, 0, 0, 0, 0, 0, 0, 0,
+    220, 0, 261.63, 0, 329.63, 0, 261.63, 0, 220, 0, 196, 0, 164.81, 0, 0, 0,
+  ];
+
+  private static musicGain: GainNode | null = null;
+  private static musicTimer: ReturnType<typeof setInterval> | null = null;
+  private static musicStep = 0;
+  private static nextStepTime = 0;
+  private static noiseBuffer: AudioBuffer | null = null;
+
+  public static startMusic() {
+    if (this.isMuted) return;
+    const ctx = this.init();
+    if (!ctx) return;
+    if (this.musicTimer) return;
+
+    if (!this.musicGain) {
+      this.musicGain = ctx.createGain();
+      this.musicGain.gain.value = 0.32;
+      this.musicGain.connect(ctx.destination);
+    }
+
+    this.musicStep = 0;
+    this.nextStepTime = ctx.currentTime + 0.08;
+    this.musicTimer = setInterval(() => this.pumpMusic(ctx), 30);
+  }
+
+  public static stopMusic() {
+    if (this.musicTimer) {
+      clearInterval(this.musicTimer);
+      this.musicTimer = null;
+    }
+  }
+
+  private static pumpMusic(ctx: AudioContext) {
+    if (this.isMuted) return;
+    const stepDur = 60 / this.MUSIC_BPM / 4; // 16th notes
+    // Lookahead scheduler: keep ~180ms of notes queued ahead of the clock
+    while (this.nextStepTime < ctx.currentTime + 0.18) {
+      this.scheduleStep(this.musicStep, this.nextStepTime, stepDur);
+      this.nextStepTime += stepDur;
+      this.musicStep = (this.musicStep + 1) % 64;
+    }
+  }
+
+  private static scheduleStep(step: number, t: number, stepDur: number) {
+    const ctx = this.ctx;
+    if (!ctx || !this.musicGain) return;
+
+    // Kick on every quarter note
+    if (step % 4 === 0) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(130, t);
+      osc.frequency.exponentialRampToValueAtTime(42, t + 0.12);
+      gain.gain.setValueAtTime(0.5, t);
+      gain.gain.exponentialRampToValueAtTime(0.01, t + 0.14);
+      osc.connect(gain);
+      gain.connect(this.musicGain);
+      osc.start(t);
+      osc.stop(t + 0.15);
+    }
+
+    // Hat on the off-beats
+    if (step % 4 === 2) {
+      const src = ctx.createBufferSource();
+      src.buffer = this.getNoiseBuffer(ctx);
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'highpass';
+      filter.frequency.value = 7000;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.07, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+      src.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.musicGain);
+      src.start(t);
+      src.stop(t + 0.05);
+    }
+
+    // Bass pulse
+    const bassFreq = this.BASS_LINE[step];
+    if (bassFreq > 0) {
+      const osc = ctx.createOscillator();
+      const filter = ctx.createBiquadFilter();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(bassFreq, t);
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(320, t);
+      gain.gain.setValueAtTime(0.18, t);
+      gain.gain.exponentialRampToValueAtTime(0.01, t + stepDur * 0.9);
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.musicGain);
+      osc.start(t);
+      osc.stop(t + stepDur);
+    }
+
+    // Sparse lead
+    const leadFreq = this.LEAD_LINE[step];
+    if (leadFreq > 0) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(leadFreq, t);
+      gain.gain.setValueAtTime(0.045, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + stepDur * 1.8);
+      osc.connect(gain);
+      gain.connect(this.musicGain);
+      osc.start(t);
+      osc.stop(t + stepDur * 2);
+    }
+  }
+
+  private static getNoiseBuffer(ctx: AudioContext): AudioBuffer {
+    if (!this.noiseBuffer) {
+      const len = Math.floor(ctx.sampleRate * 0.5);
+      this.noiseBuffer = ctx.createBuffer(1, len, ctx.sampleRate);
+      const data = this.noiseBuffer.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    }
+    return this.noiseBuffer;
   }
 
   public static playHit(isCritical = false) {
@@ -277,5 +427,28 @@ export default class SoundSynth {
 
     osc.start(now);
     osc.stop(now + 0.50);
+  }
+
+  public static playPizza() {
+    const ctx = this.init();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    // Double chomp: two quick descending blips
+    [660, 990].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, now + i * 0.08);
+      osc.frequency.exponentialRampToValueAtTime(freq * 0.6, now + i * 0.08 + 0.07);
+
+      gain.gain.setValueAtTime(0.18, now + i * 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.08 + 0.09);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + i * 0.08);
+      osc.stop(now + i * 0.08 + 0.1);
+    });
   }
 }

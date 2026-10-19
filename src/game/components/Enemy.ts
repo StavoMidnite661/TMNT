@@ -1,13 +1,18 @@
 import Phaser from 'phaser';
 import SoundSynth from '../utils/SoundSynth';
+import type Player from './Player';
+
+/** Minimum gap between melee hits landed on this enemy (one hit per swing). */
+const MELEE_HIT_WINDOW_MS = 380;
 
 export default class Enemy extends Phaser.Physics.Arcade.Sprite {
   private health = 20;
   private isDead = false;
-  private target?: Phaser.GameObjects.Sprite;
+  private target?: Player;
   private enemyType: 'thug' | 'foot_soldier' | 'drone';
   private lastAttackTime = 0;
   private attackCooldown = 1500;
+  private lastMeleeHitTime = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number, type: 'thug' | 'foot_soldier' | 'drone' = 'thug') {
     super(scene, x, y, type === 'drone' ? 'drone_sprite' : 'thug_ultra_sprites'); 
@@ -28,6 +33,7 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
         body.setSize(32, 32);
         body.setOffset(16, 16);
         body.setAllowGravity(false); // Hovering/flying drone
+        body.setMaxVelocity(340, 340); // Keep drone steering smooth, not twitchy
         this.attackCooldown = 2200;
     } else if (type === 'foot_soldier') {
         this.health = 20;
@@ -52,8 +58,17 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.setDepth(y);
   }
 
-  setTarget(target: Phaser.GameObjects.Sprite) {
+  setTarget(target: Player) {
     this.target = target;
+  }
+
+  /** True when the enemy can absorb another melee hit (rate-limits per-swing damage). */
+  canBeHit(now: number) {
+    return now - this.lastMeleeHitTime >= MELEE_HIT_WINDOW_MS;
+  }
+
+  markHit(now: number) {
+    this.lastMeleeHitTime = now;
   }
 
   private createHQAnimations() {
@@ -164,7 +179,7 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
             if (now - this.lastAttackTime > this.attackCooldown) {
                 this.lastAttackTime = now;
                 this.play('thug_attack', true);
-                (this.target as any).takeDamage(8);
+                this.target.takeDamage(8);
                 
                 this.once('animationcomplete-thug_attack', () => {
                    if (!this.isDead) this.play('thug_idle', true);
@@ -191,7 +206,7 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
           if (now - this.lastAttackTime > this.attackCooldown) {
               this.lastAttackTime = now;
               this.play('thug_attack', true);
-              (this.target as any).takeDamage(5);
+              this.target.takeDamage(5);
               
               this.once('animationcomplete-thug_attack', () => {
                  if (!this.isDead) this.play('thug_idle', true);
@@ -238,7 +253,7 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
         shurikenObj.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
 
         const overlap = this.scene.physics.add.overlap(shurikenObj, this.target, (_shur, playerObj) => {
-            (playerObj as any).takeDamage(7);
+            (playerObj as Player).takeDamage(7);
 
             // Shuriken metal sparkle glow
             const flash = this.scene.add.circle(shurikenObj.x, shurikenObj.y, 10, 0xffaa00, 0.7);
@@ -292,7 +307,7 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
     laserObj.setRotation(angle);
 
     const overlap = this.scene.physics.add.overlap(laserObj, this.target, (_laser, playerObj) => {
-        (playerObj as any).takeDamage(6);
+        (playerObj as Player).takeDamage(6);
 
         // Cyber energy impact flash
         const energyGlow = this.scene.add.circle(laserObj.x, laserObj.y, 12, 0x00f3ff, 0.85);
